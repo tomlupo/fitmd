@@ -1,0 +1,351 @@
+// Prisma Schema for FitMD - Markdown-first Fitness Workspace
+// Database: PostgreSQL (Neon/Supabase)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== AUTH ====================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  password      String?
+  image         String?
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts       Account[]
+  sessions       Session[]
+  files          MarkdownFile[]
+  workoutSessions WorkoutSession[]
+  coachProfile   Coach?          @relation("UserCoach")
+  clientProfile  Client?         @relation("UserClient")
+  subscription   Subscription?
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum UserRole {
+  USER
+  COACH
+  ADMIN
+}
+
+// ==================== COACH/CLIENT ====================
+
+model Coach {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  bio       String?
+  specialty String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User     @relation("UserCoach", fields: [userId], references: [id], onDelete: Cascade)
+  clients Client[]
+  plans   Plan[]
+}
+
+model Client {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  coachId   String?
+  notes     String?
+  goals     String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user            User             @relation("UserClient", fields: [userId], references: [id], onDelete: Cascade)
+  coach           Coach?           @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  assignedPlans   PlanAssignment[]
+}
+
+// ==================== EXERCISE DATABASE ====================
+
+model Exercise {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  aliases     String[]       // Alternative names for AI matching
+  muscles     String[]       // primary muscles
+  equipment   String[]       // required equipment
+  tags        String[]       // hypertrophy, strength, power, etc.
+  type        ExerciseType
+  unit        ExerciseUnit   @default(KG)
+  videoUrl    String?
+  description String?
+  isCustom    Boolean        @default(false)
+  createdBy   String?        // userId if custom
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  templateExercises TemplateExercise[]
+  setLogs          SetLog[]
+}
+
+enum ExerciseType {
+  STRENGTH
+  CARDIO
+  FLEXIBILITY
+  PLYOMETRIC
+  BODYWEIGHT
+  MACHINE
+  CABLE
+  FREE_WEIGHT
+}
+
+enum ExerciseUnit {
+  KG
+  LBS
+  TIME
+  DISTANCE
+  REPS
+  CALORIES
+}
+
+// ==================== MARKDOWN FILES (Virtual Vault) ====================
+
+model MarkdownFile {
+  id        String       @id @default(cuid())
+  userId    String
+  path      String       // e.g., "/workouts/push-day.md"
+  title     String
+  content   String       @db.Text
+  folder    FileFolder   @default(WORKOUTS)
+  tags      String[]
+  links     String[]     // [[linked-file]] references
+  metadata  Json?        // @duration, @goal, etc.
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template WorkoutTemplate?
+
+  @@unique([userId, path])
+  @@index([userId, folder])
+}
+
+enum FileFolder {
+  WORKOUTS
+  PLANS
+  LOGS
+  NOTES
+  CLIENTS
+}
+
+// ==================== WORKOUT TEMPLATES ====================
+
+model WorkoutTemplate {
+  id           String   @id @default(cuid())
+  fileId       String   @unique
+  name         String
+  duration     Int?     // minutes
+  goal         String?  // hypertrophy, strength, etc.
+  parsedData   Json     // Full parsed JSON structure
+  isValid      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  file      MarkdownFile     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  exercises TemplateExercise[]
+  sessions  WorkoutSession[]
+  planItems PlanItem[]
+}
+
+model TemplateExercise {
+  id           String   @id @default(cuid())
+  templateId   String
+  exerciseId   String
+  order        Int
+  sets         Int
+  reps         String   // Can be range "8-12" or fixed "5"
+  weight       Float?
+  restSeconds  Int?
+  rpe          Int?     // 1-10
+  notes        String?
+  isSuperset   Boolean  @default(false)
+  supersetGroup Int?    // Groups superset exercises
+  createdAt    DateTime @default(now())
+
+  template WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  exercise Exercise        @relation(fields: [exerciseId], references: [id])
+
+  @@index([templateId])
+}
+
+// ==================== WORKOUT SESSIONS (Execution) ====================
+
+model WorkoutSession {
+  id          String        @id @default(cuid())
+  userId      String
+  templateId  String?
+  name        String
+  status      SessionStatus @default(PLANNED)
+  startedAt   DateTime?
+  completedAt DateTime?
+  duration    Int?          // actual duration in seconds
+  notes       String?
+  rating      Int?          // 1-5 session rating
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template WorkoutTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  sets     SetLog[]
+
+  @@index([userId, status])
+  @@index([userId, completedAt])
+}
+
+enum SessionStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+model SetLog {
+  id          String   @id @default(cuid())
+  sessionId   String
+  exerciseId  String
+  setNumber   Int
+  targetReps  Int?
+  actualReps  Int?
+  targetWeight Float?
+  actualWeight Float?
+  rpe         Int?     // 1-10
+  notes       String?
+  isWarmup    Boolean  @default(false)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  session  WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exercise Exercise       @relation(fields: [exerciseId], references: [id])
+
+  @@index([sessionId])
+  @@index([exerciseId])
+}
+
+// ==================== TRAINING PLANS ====================
+
+model Plan {
+  id          String   @id @default(cuid())
+  coachId     String?
+  name        String
+  description String?
+  weeks       Int      @default(4)
+  goal        String?
+  difficulty  String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  coach       Coach?           @relation(fields: [coachId], references: [id], onDelete: SetNull)
+  items       PlanItem[]
+  assignments PlanAssignment[]
+}
+
+model PlanItem {
+  id         String   @id @default(cuid())
+  planId     String
+  templateId String?
+  week       Int
+  day        Int      // 1-7
+  order      Int
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  plan     Plan             @relation(fields: [planId], references: [id], onDelete: Cascade)
+  template WorkoutTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+
+  @@index([planId, week, day])
+}
+
+model PlanAssignment {
+  id        String   @id @default(cuid())
+  planId    String
+  clientId  String
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, clientId])
+}
+
+// ==================== SUBSCRIPTION ====================
+
+model Subscription {
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  plan            SubscriptionPlan @default(FREE)
+  status          SubStatus        @default(ACTIVE)
+  stripeCustomerId String?
+  stripePriceId   String?
+  stripeSubId     String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum SubscriptionPlan {
+  FREE
+  AI_BASIC      // AI features
+  AI_PRO        // Advanced AI + analytics
+  COACH         // Coach features + clients
+}
+
+enum SubStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}

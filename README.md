@@ -1,105 +1,217 @@
-# Dime — iOS-style expense tracker
+# FitMD — Markdown-first Fitness Workspace
 
-A personal expense and income tracker built as a single-page web app with an **iOS-native feel**: bottom tab bar, sheet modals, safe-area-aware layout, and system typography. No account required; data is stored in the browser (localStorage).
+A **notebook-first fitness workspace** that combines the best of Obsidian (markdown notes), Stryd (workout execution), TrainerRoad (training plans), and AI coaching. Write workouts like notes, execute them like a dedicated training app.
 
-**Repository:** [github.com/tomlupo/ios-replication](https://github.com/tomlupo/ios-replication)
+**Single source of truth = `.md` files**
 
 ## Features
 
-- **Log** — Transactions by timeframe (Today / Week / Month / Year / All), net/income/expense summary, search, and filter
-- **Insights** — Spending and income breakdown by category and period
-- **Budget** — Overall and per-category budgets with progress
-- **Settings** — Currency, theme (light/dark/system), categories, export/import/clear data
+### ✍️ Notebook Mode (Obsidian-like)
+- TipTap Markdown editor with live preview
+- File tree with folders: `/workouts`, `/plans`, `/logs`, `/notes`, `/clients`
+- Internal links `[[Push Day]]` and tags `#hypertrophy`
+- **AI Normalize** button to convert messy notes → structured format
 
-## Tech stack
+### 🏃 Workout Mode (Stryd-like)
+- Large timers, next/complete buttons, auto rest
+- **Zero typing during workout** — tap only
+- Real-time progress tracking
+- Automatic set logging
 
-| Layer     | Tech |
-|----------|------|
-| Build    | [Vite](https://vite.dev/) 7 |
-| UI       | [React](https://react.dev/) 19 |
-| Language | [TypeScript](https://www.typescriptlang.org/) 5.9 |
-| Styling  | [Tailwind CSS](https://tailwindcss.com/) 4 |
-| Dates    | [date-fns](https://date-fns.org/) 4 |
-| State    | Custom store + hooks, persisted to localStorage |
+### 📊 Analytics Mode
+- Weekly volume charts
+- Personal record detection
+- Progression tracking per exercise
+- Compliance & streak tracking
+- CSV/JSON export
 
-No router; navigation is tab-based within a single page.
+### 👥 Coach Mode
+- Client management
+- Assign training plans
+- View compliance & progress
+- Add notes per client
 
-## Getting started
+### 🤖 AI Coach
+- Generate workouts from goals/constraints
+- Adapt based on fatigue levels
+- Suggest progressions
+- Auto-periodization
+
+## Workout Markdown Format
+
+```markdown
+# Push Day
+
+@duration 45m
+@goal hypertrophy
+
+## Bench Press
+4x5 @80kg
+rest 120s
+rpe 8
+
+## Superset
+## Lateral Raise
+3x12 @10kg
+
+## Tricep Pushdown
+3x12 @25kg
+rest 60s
+
+> Focus on mind-muscle connection
+```
+
+**Flow:** `user text → AI normalize → parser → JSON → workout engine`
+
+## Tech Stack
+
+| Layer | Tech |
+|-------|------|
+| Framework | [Next.js 15](https://nextjs.org/) (App Router) |
+| UI | [React 19](https://react.dev/) |
+| Language | [TypeScript 5](https://www.typescriptlang.org/) |
+| Editor | [TipTap](https://tiptap.dev/) (ProseMirror) |
+| Styling | [Tailwind CSS 3](https://tailwindcss.com/) |
+| Database | PostgreSQL ([Neon](https://neon.tech/) / [Supabase](https://supabase.com/)) |
+| ORM | [Prisma](https://www.prisma.io/) |
+| AI | [OpenAI](https://openai.com/) / [Anthropic Claude](https://anthropic.com/) |
+| Auth | [NextAuth.js](https://next-auth.js.org/) v5 |
+| Deploy | [Vercel](https://vercel.com/) |
+
+## Getting Started
 
 ### Prerequisites
-
 - Node.js 18+
-- npm (or compatible package manager)
+- PostgreSQL database (or use Neon/Supabase)
 
-### Install and run
+### Install
 
 ```bash
 npm install
+```
+
+### Environment Setup
+
+Copy the environment template and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Required variables:
+- `DATABASE_URL` — PostgreSQL connection string
+- `NEXTAUTH_URL` — Your app URL (http://localhost:3000 for dev)
+- `NEXTAUTH_SECRET` — Generate with `openssl rand -base64 32`
+- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` — For AI features
+
+### Database Setup
+
+```bash
+# Generate Prisma client
+npm run db:generate
+
+# Push schema to database
+npm run db:push
+
+# Seed exercise database
+npm run db:seed
+```
+
+### Development
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173). For a quick tunnel (e.g. to test on a phone):
+Open [http://localhost:3000](http://localhost:3000)
 
-```bash
-npm run tunnel
-```
-
-### Build for production
+### Production Build
 
 ```bash
 npm run build
+npm run start
 ```
 
-Output is in `dist/`. Preview the production build:
-
-```bash
-npm run preview
-```
-
-### Lint
-
-```bash
-npm run lint
-```
-
-## Project structure
+## Project Structure
 
 ```
 src/
-├── App.tsx              # Root layout, tab state, modals
-├── main.tsx
-├── index.css            # Tailwind, theme, global styles, animations
+├── app/                  # Next.js App Router
+│   ├── layout.tsx        # Root layout
+│   ├── page.tsx          # Main page (mode switcher)
+│   └── globals.css       # Tailwind + custom styles
 ├── components/
-│   ├── TabBar.tsx      # Bottom nav + FAB
-│   ├── log/            # Log view (list, summary, filters)
-│   ├── insights/       # Insights view (charts, breakdown)
-│   ├── budget/         # Budget view (overall + category)
-│   ├── settings/       # Settings view
-│   ├── transaction/    # Add/Edit transaction form
-│   ├── category/       # Category manager
-│   └── common/         # Modal, Toast, ConfirmDialog, EmptyState
-├── store/              # localStorage persistence (categories, transactions, budgets, settings)
-├── hooks/              # useStore-derived hooks
-├── types/              # Shared TypeScript types and defaults
-└── utils/              # format, dateUtils
+│   ├── providers.tsx     # Theme & app state providers
+│   ├── navigation.tsx    # Sidebar + mobile nav
+│   ├── editor/           # Notebook mode components
+│   │   ├── notebook-mode.tsx
+│   │   ├── file-tree.tsx
+│   │   ├── markdown-editor.tsx
+│   │   └── editor-toolbar.tsx
+│   ├── workout/          # Workout execution
+│   │   ├── workout-mode.tsx
+│   │   ├── workout-selector.tsx
+│   │   ├── workout-execution.tsx
+│   │   └── workout-complete.tsx
+│   ├── analytics/        # Analytics dashboard
+│   │   └── analytics-mode.tsx
+│   └── coach/            # Coach/client management
+│       └── coach-mode.tsx
+├── lib/
+│   ├── utils.ts          # Utility functions
+│   ├── prisma.ts         # Prisma client
+│   ├── parser.ts         # Markdown → JSON parser
+│   └── ai-coach.ts       # AI service
+├── hooks/
+│   ├── use-workout.ts    # Workout execution state
+│   └── use-vault.ts      # File management
+└── types/
+    └── index.ts          # TypeScript definitions
+
+prisma/
+├── schema.prisma         # Database schema
+└── seed.ts               # Exercise database seed
 ```
 
-## Design (iOS vibe)
+## Data Model
 
-- **PWA-friendly:** `viewport-fit=cover`, `apple-mobile-web-app-capable`, theme-color for status bar
-- **Safe areas:** Tab bar and form footers use `env(safe-area-inset-bottom)`
-- **Typography:** System font stack (`-apple-system`, SF Pro Display, etc.)
-- **UI patterns:** Bottom sheet modals, frosted tab bar, grouped rounded cards, segmented controls
-- **Animations:** Sheet slide-up, light fade/scale; short durations
+- **User** — Account with role (USER/COACH/ADMIN)
+- **Exercise** — Exercise database with muscles, equipment, tags
+- **MarkdownFile** — Virtual vault files stored in DB
+- **WorkoutTemplate** — Parsed workout structure
+- **WorkoutSession** — Workout execution instance
+- **SetLog** — Individual set records
+- **Plan** — Training plan with weekly structure
+- **Client** — Coach's client with assigned plans
+- **Subscription** — AI subscription tiers
 
-## Data and privacy
+## API Routes (Server Actions)
 
-All data stays in your browser. No server or account. Export (JSON) and import are available in Settings.
+All data operations use Next.js Server Actions for type-safe, zero-config API calls.
 
-## Documentation
+## Deployment
 
-- **[PRD.md](./PRD.md)** — Product requirements, feature scope, data model, and out-of-scope items
+### Vercel (Recommended)
+
+1. Push to GitHub
+2. Import to Vercel
+3. Add environment variables
+4. Deploy
+
+### Database
+
+- **Neon**: Serverless PostgreSQL, auto-scales, generous free tier
+- **Supabase**: PostgreSQL + auth + realtime, good for full-stack
+
+## Roadmap
+
+- [ ] Audio cues during workout
+- [ ] Watch sync (WearOS/watchOS)
+- [ ] Stripe payments for AI subscription
+- [ ] Mobile PWA with offline support
+- [ ] Video exercise demos
+- [ ] Social features (share workouts)
 
 ## License
 
-Private / unlicensed unless stated otherwise.
+MIT
