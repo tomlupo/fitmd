@@ -1,83 +1,224 @@
-export interface Category {
-  id: string;
-  name: string;
-  emoji: string;
-  color: string;
-  type: 'expense' | 'income';
-  order: number;
+// ==================== Workout Parser Types ====================
+
+export interface ParsedWorkout {
+  name: string
+  metadata: WorkoutMetadata
+  exercises: ParsedExercise[]
+  isValid: boolean
+  errors: string[]
 }
 
-export interface Transaction {
-  id: string;
-  amount: number;
-  note: string;
-  categoryId: string;
-  date: string; // ISO date string
-  type: 'expense' | 'income';
-  isRecurring: boolean;
-  recurringInterval?: 'daily' | 'weekly' | 'monthly' | 'yearly';
-  createdAt: string;
+export interface WorkoutMetadata {
+  duration?: number // minutes
+  goal?: string
+  tags?: string[]
+  notes?: string
 }
 
-export interface Budget {
-  id: string;
-  amount: number;
-  type: 'overall' | 'category';
-  categoryId?: string;
-  timeframe: 'daily' | 'weekly' | 'monthly' | 'yearly';
-  startDay: number; // day of week (0-6) or day of month (1-31)
-  createdAt: string;
+export interface ParsedExercise {
+  name: string
+  sets: ParsedSet[]
+  restSeconds?: number
+  rpe?: number
+  notes?: string
+  isSuperset: boolean
+  supersetGroup?: number
 }
 
-export interface Settings {
-  currency: string;
-  currencySymbol: string;
-  showDecimals: boolean;
-  darkMode: 'light' | 'dark' | 'system';
-  firstDayOfWeek: number; // 0=Sun, 1=Mon
-  startDayOfMonth: number;
-  showCents: boolean;
+export interface ParsedSet {
+  reps: string // Can be "5" or "8-12" or "AMRAP"
+  weight?: number
+  unit?: 'kg' | 'lbs'
+  isWarmup?: boolean
 }
 
-export type TabType = 'log' | 'insights' | 'budget' | 'settings';
+// ==================== Workout Execution Types ====================
 
-export type TimeFrame = 'day' | 'week' | 'month' | 'year' | 'all';
-
-export type FilterType = 'all' | 'income' | 'expense';
-
-export interface ChartData {
-  label: string;
-  value: number;
-  color?: string;
+export interface WorkoutState {
+  sessionId: string
+  templateId?: string
+  name: string
+  status: 'idle' | 'running' | 'paused' | 'rest' | 'completed'
+  currentExerciseIndex: number
+  currentSetIndex: number
+  exercises: ExecutionExercise[]
+  startedAt?: Date
+  totalTime: number // seconds
+  restTimeRemaining: number // seconds
 }
 
-export const DEFAULT_EXPENSE_CATEGORIES: Omit<Category, 'id' | 'order'>[] = [
-  { name: 'Food', emoji: '🍔', color: '#F97316', type: 'expense' },
-  { name: 'Transport', emoji: '🚆', color: '#3B82F6', type: 'expense' },
-  { name: 'Rent', emoji: '🏠', color: '#8B5CF6', type: 'expense' },
-  { name: 'Subscriptions', emoji: '🔄', color: '#EC4899', type: 'expense' },
-  { name: 'Groceries', emoji: '🛒', color: '#10B981', type: 'expense' },
-  { name: 'Family', emoji: '👨‍👩‍👦', color: '#F59E0B', type: 'expense' },
-  { name: 'Utilities', emoji: '💡', color: '#6366F1', type: 'expense' },
-  { name: 'Fashion', emoji: '👔', color: '#14B8A6', type: 'expense' },
-  { name: 'Healthcare', emoji: '🚑', color: '#EF4444', type: 'expense' },
-  { name: 'Pets', emoji: '🐕', color: '#A855F7', type: 'expense' },
-  { name: 'Sneakers', emoji: '👟', color: '#F472B6', type: 'expense' },
-  { name: 'Gifts', emoji: '🎁', color: '#06B6D4', type: 'expense' },
-];
+export interface ExecutionExercise {
+  id: string
+  exerciseId: string
+  name: string
+  sets: ExecutionSet[]
+  restSeconds: number
+  isSuperset: boolean
+  supersetGroup?: number
+  notes?: string
+}
 
-export const DEFAULT_INCOME_CATEGORIES: Omit<Category, 'id' | 'order'>[] = [
-  { name: 'Paycheck', emoji: '💰', color: '#10B981', type: 'income' },
-  { name: 'Allowance', emoji: '🤑', color: '#10B981', type: 'income' },
-  { name: 'Part-Time', emoji: '💼', color: '#10B981', type: 'income' },
-  { name: 'Investments', emoji: '💹', color: '#10B981', type: 'income' },
-  { name: 'Gifts', emoji: '🧧', color: '#10B981', type: 'income' },
-  { name: 'Tips', emoji: '🪙', color: '#10B981', type: 'income' },
-];
+export interface ExecutionSet {
+  id: string
+  setNumber: number
+  targetReps: number
+  targetWeight?: number
+  actualReps?: number
+  actualWeight?: number
+  rpe?: number
+  isWarmup: boolean
+  isCompleted: boolean
+  completedAt?: Date
+}
 
-export const CATEGORY_COLORS = [
-  '#F97316', '#3B82F6', '#8B5CF6', '#EC4899', '#10B981',
-  '#F59E0B', '#6366F1', '#14B8A6', '#EF4444', '#A855F7',
-  '#F472B6', '#06B6D4', '#84CC16', '#D946EF', '#0EA5E9',
-  '#E11D48', '#7C3AED', '#059669', '#DC2626', '#2563EB',
-];
+// ==================== Analytics Types ====================
+
+export interface WeeklyVolume {
+  week: string // ISO week string
+  volume: number // total reps * weight
+  sessions: number
+  exercises: Record<string, number> // exercise -> volume
+}
+
+export interface PersonalRecord {
+  exerciseId: string
+  exerciseName: string
+  type: 'weight' | 'reps' | 'volume'
+  value: number
+  previousValue?: number
+  achievedAt: Date
+  sessionId: string
+}
+
+export interface ProgressData {
+  exerciseId: string
+  exerciseName: string
+  data: {
+    date: string
+    maxWeight: number
+    maxReps: number
+    volume: number
+  }[]
+}
+
+export interface ComplianceStats {
+  planned: number
+  completed: number
+  skipped: number
+  percentage: number
+  streak: number
+}
+
+// ==================== AI Coach Types ====================
+
+export interface AICoachRequest {
+  type: 'generate' | 'adapt' | 'suggest' | 'periodize'
+  goals?: string[]
+  availableTime?: number // minutes
+  equipment?: string[]
+  fatigueLevel?: number // 1-10
+  history?: WorkoutHistorySummary
+  currentPlan?: string // markdown
+  preferences?: UserPreferences
+}
+
+export interface AICoachResponse {
+  markdown: string
+  reasoning?: string
+  suggestions?: string[]
+  warnings?: string[]
+}
+
+export interface WorkoutHistorySummary {
+  recentSessions: number
+  weeklyVolume: number
+  frequencyPerWeek: number
+  topExercises: { name: string; frequency: number }[]
+  recentPRs: string[]
+}
+
+export interface UserPreferences {
+  preferredExercises?: string[]
+  avoidExercises?: string[]
+  workoutDuration?: number
+  daysPerWeek?: number
+  goals?: string[]
+}
+
+// ==================== File System Types ====================
+
+export interface VaultFile {
+  id: string
+  path: string
+  title: string
+  content: string
+  folder: 'workouts' | 'plans' | 'logs' | 'notes' | 'clients'
+  tags: string[]
+  links: string[]
+  metadata: Record<string, string | number>
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface FileTreeNode {
+  id: string
+  name: string
+  type: 'file' | 'folder'
+  path: string
+  children?: FileTreeNode[]
+  file?: VaultFile
+}
+
+// ==================== Editor Types ====================
+
+export interface EditorState {
+  activeFile: VaultFile | null
+  isModified: boolean
+  isSaving: boolean
+  lastSaved?: Date
+}
+
+export interface NormalizationResult {
+  original: string
+  normalized: string
+  diff: DiffLine[]
+  isChanged: boolean
+}
+
+export interface DiffLine {
+  type: 'unchanged' | 'added' | 'removed'
+  content: string
+  lineNumber: number
+}
+
+// ==================== UI State Types ====================
+
+export type AppMode = 'notebook' | 'workout' | 'analytics' | 'coach'
+
+export interface AppState {
+  mode: AppMode
+  sidebarOpen: boolean
+  theme: 'light' | 'dark' | 'system'
+}
+
+// ==================== Export Types ====================
+
+export interface ExportOptions {
+  format: 'csv' | 'json' | 'markdown'
+  dateRange?: {
+    start: Date
+    end: Date
+  }
+  includeMetadata: boolean
+}
+
+export interface CSVExportRow {
+  date: string
+  session: string
+  exercise: string
+  setNumber: number
+  reps: number
+  weight: number
+  rpe?: number
+  volume: number
+}
